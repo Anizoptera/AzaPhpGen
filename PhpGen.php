@@ -64,7 +64,26 @@ class PhpGen
 
 
 	/**
-	 * Generation of php code for scalar vaues and arrays
+	 * Generation of php code for various data without trailing semicolon.
+	 *
+	 * WARNING!
+	 * Don't use self referencing arrays and objects!
+	 *
+	 * @see getCode
+	 *
+	 * @param mixed $data     Data
+	 * @param int   $indent   Indent size in tabs for array php code
+	 * @param bool  $noFormat No formatting and indention
+	 *
+	 * @return string
+	 */
+	public static function getCodeNoTail($data, $indent = 0, $noFormat = false)
+	{
+		return self::getCode($data, $indent, $noFormat, true);
+	}
+
+	/**
+	 * Generation of php code for various data
 	 *
 	 * WARNING!
 	 * Don't use self referencing arrays and objects!
@@ -112,6 +131,7 @@ class PhpGen
 		}
 		return "'" . addcslashes($data, "'\\") . "'" . $tail;
 	}
+
 
 	/**
 	 * Returns php code for object
