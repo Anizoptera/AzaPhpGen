@@ -1,6 +1,7 @@
 <?php
 
 namespace Aza\Components\PhpGen;
+use Traversable;
 
 /**
  * PHP code generation
@@ -48,17 +49,18 @@ class PhpGen
 
 
 	// TODO: В массивах если значение-массив разрывает список, то можно отступы до и после него рассчитывать отдельно
-	// TODO: Instance + Singleton trait
+	// TODO: Work as instance
+	// TODO: Cover with tests
 
 
 	/**
 	 * Returns singleton instance of the class
 	 *
-	 * @return PhpGen
+	 * @return self
 	 */
 	final public static function instance()
 	{
-		static $instance = null;
+		static $instance;
 		return $instance ?: $instance = new self;
 	}
 
@@ -103,17 +105,9 @@ class PhpGen
 		if (!isset($data)) {
 			return 'null' . $tail;
 		}
-		// Bool
-		else if (is_bool($data)) {
-			return ($data ? 'true' : 'false') . $tail;
-		}
-		// Int
-		else if (is_int($data)) {
-			return (int)$data . $tail;
-		}
-		// Float
-		else if (is_float($data)) {
-			return str_replace(',', '.', (float)$data) . $tail;
+		// Bool / Int / Float
+		else if (is_bool($data) || is_int($data) || is_float($data)) {
+			return var_export($data, true) . $tail;
 		}
 		// Array
 		else if (is_array($data) || $data instanceof \Traversable) {
@@ -124,9 +118,13 @@ class PhpGen
 			return self::getObject($data) . $tail;
 		}
 		// String
-		if (self::$oneLineStrings && (false !== strpos($data, "\n") || false !== strpos($data, "\r"))) {
+		// TODO: Test for chars with all ASCII chars
+		if (self::$oneLineStrings
+		    && (false !== strpos($data, "\n")
+		        || false !== strpos($data, "\r"))
+		) {
 			$data = addcslashes($data, '"$\\');
-			$data = str_replace(array("\n", "\r"), array('\n', '\r'), $data);
+			$data = str_replace(["\n", "\r"], ['\n', '\r'], $data);
 			return '"' . $data . '"' . $tail;
 		}
 		return "'" . addcslashes($data, "'\\") . "'" . $tail;
@@ -142,6 +140,7 @@ class PhpGen
 	 */
 	protected static function getObject($object)
 	{
+		// TODO: Closure support
 		if ($object instanceof IPhpGenerable) {
 			return $object->generateCode();
 		}
