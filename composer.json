@@ -1,0 +1,31 @@
+{
+	"name": "aza/phpgen",
+	"description": "AzaPhpGen - Anizoptera CMF PHP code generation (dump) component. Allows to dump complex arrays, objects, closures and basic data types as php code. In part, this can be called a some sort of serialization. You can customize your dumped php code as you wish.",
+	"keywords": [
+		"php", "code", "dump", "generation", "serialization"
+	],
+	"homepage": "https://github.com/Anizoptera/PhpGen",
+	"license": "MIT",
+	"support": {
+		"issues": "https://github.com/Anizoptera/PhpGen/issues"
+	},
+	"authors": [
+		{"name": "Amal Samally", "email": "amal.samally@gmail.com", "homepage": "https://github.com/amal"},
+		{"name": "AzaGroup Members"}
+	],
+	"require": {
+		"php": ">=5.3.3"
+	},
+	"autoload": {
+		"psr-0": {
+			"Aza\\Components\\PhpGen": ""
+		}
+	},
+	"target-dir": "Aza/Components/PhpGen",
+	"extra": {
+		"branch-alias": {
+			"dev-master": "1.x-dev"
+		}
+	},
+	"minimum-stability": "dev"
+}
