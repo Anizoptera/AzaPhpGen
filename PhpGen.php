@@ -14,43 +14,43 @@ class PhpGen
 	/**
 	 * Length of one tab in spaces
 	 */
-	public static $tabLength = 4;
+	public $tabLength = 4;
 
 	/**
 	 * Use spaces instead of tabs for indentation
 	 */
-	public static $useSpaces = false;
+	public $useSpaces = false;
 
 	/**
 	 * Mix tabs with spaces in the end of indentation
 	 */
-	public static $mixSpaces = true;
+	public $mixSpaces = true;
 
 	/**
 	 * Mix tabs with spaces in the end of indentation
 	 */
-	public static $spacesAfterKey = true;
+	public $spacesAfterKey = true;
 
 	/**
 	 * Output string variables as one line.
 	 * Converts \n and \r symbols to escaped characters.
 	 */
-	public static $oneLineStrings = false;
+	public $oneLineStrings = false;
 
 	/**
 	 * Output array keys for serial arrays.
 	 */
-	public static $outputSerialKeys = false;
+	public $outputSerialKeys = false;
 
 	/**
 	 * Use php 5.4 short array syntax
 	 */
-	public static $shortArraySyntax = false;
+	public $shortArraySyntax = false;
 
 
 	// TODO: В массивах если значение-массив разрывает список, то можно отступы до и после него рассчитывать отдельно
-	// TODO: Work as instance
 	// TODO: Cover with tests
+	// TODO: Basic class CustomCode implementing IPhpGenerable
 
 
 	/**
@@ -58,18 +58,44 @@ class PhpGen
 	 *
 	 * @return self
 	 */
-	final public static function instance()
+	public static function instance()
 	{
 		static $instance;
 		return $instance ?: $instance = new self;
 	}
 
+	/**
+	 * Constructor
+	 */
+	public function __construct()
+	{
+		$this->shortArraySyntax = version_compare(PHP_VERSION, '5.4.0', '>=');
+	}
+
 
 	/**
-	 * Generation of php code for various data without trailing semicolon.
+	 * Generation of php code for various data without formatting.
 	 *
 	 * WARNING!
-	 * Don't use self referencing arrays and objects!
+	 * Don't use for self referencing arrays and objects!
+	 *
+	 * @see getCode
+	 *
+	 * @param mixed $data   Data
+	 * @param bool  $noTail Don't add trailing ";"
+	 *
+	 * @return string
+	 */
+	public function getCodeNoFormat($data, $noTail = false)
+	{
+		return $this->getCode($data, 0, true, $noTail);
+	}
+
+	/**
+	 * Generation of php code for various data without trailing semicolon (;).
+	 *
+	 * WARNING!
+	 * Don't use for self referencing arrays and objects!
 	 *
 	 * @see getCode
 	 *
@@ -79,30 +105,31 @@ class PhpGen
 	 *
 	 * @return string
 	 */
-	public static function getCodeNoTail($data, $indent = 0, $noFormat = false)
+	public function getCodeNoTail($data, $indent = 0, $noFormat = false)
 	{
-		return self::getCode($data, $indent, $noFormat, true);
+		return $this->getCode($data, $indent, $noFormat, true);
 	}
 
 	/**
-	 * Generation of php code for various data
+	 * Generation of php code for various data.
 	 *
 	 * WARNING!
-	 * Don't use self referencing arrays and objects!
+	 * Don't use for self referencing arrays and objects!
 	 *
 	 * @param mixed $data     Data
 	 * @param int   $indent   Indent size in tabs for array php code
 	 * @param bool  $noFormat No formatting and indention
-	 * @param bool  $noTail   System parameter for recursive calls
+	 * @param bool  $noTail   Don't add trailing semicolon (;)
 	 *
 	 * @return string
 	 */
-	public static function getCode($data, $indent = 0, $noFormat = false, $noTail = false)
+	public function getCode($data, $indent = 0, $noFormat = false, $noTail = false)
 	{
 		$tail = $noTail ? '' : ';';
 
 		// Null
 		if (!isset($data)) {
+			// var_export returns uppercased, so use own variant
 			return 'null' . $tail;
 		}
 		// Bool / Int / Float
@@ -111,15 +138,15 @@ class PhpGen
 		}
 		// Array
 		else if (is_array($data) || $data instanceof \Traversable) {
-			return self::getArray($data, $indent, $noFormat) . $tail;
+			return $this->getArray($data, $indent, $noFormat) . $tail;
 		}
 		// Object
 		else if (is_object($data)) {
-			return self::getObject($data) . $tail;
+			return $this->getObject($data) . $tail;
 		}
 		// String
 		// TODO: Test for chars with all ASCII chars
-		if (self::$oneLineStrings
+		if ($this->oneLineStrings
 		    && (false !== strpos($data, "\n")
 		        || false !== strpos($data, "\r"))
 		) {
@@ -138,13 +165,13 @@ class PhpGen
 	 *
 	 * @return string
 	 */
-	protected static function getObject($object)
+	protected function getObject($object)
 	{
 		// TODO: Closure support
 		if ($object instanceof IPhpGenerable) {
 			return $object->generateCode();
 		}
-		$code = self::getCode(serialize($object));
+		$code = $this->getCode(serialize($object));
 		return "unserialize({$code})";
 	}
 
@@ -157,16 +184,16 @@ class PhpGen
 	 *
 	 * @return string
 	 */
-	protected static function getArray($array, $indent = 0, $noFormat = false)
+	protected function getArray($array, $indent = 0, $noFormat = false)
 	{
-		$string = self::$shortArraySyntax ? '[' : 'array(';
+		$string = $this->shortArraySyntax ? '[' : 'array(';
 
 		if ($array) {
-			$tabLength    = (int)self::$tabLength;
-			$mixSpaces    = (bool)self::$mixSpaces;
-			$useSpaces    = self::$useSpaces;
+			$tabLength    = (int)$this->tabLength;
+			$mixSpaces    = (bool)$this->mixSpaces;
+			$useSpaces    = $this->useSpaces;
 			$tab          = $useSpaces ? str_repeat(' ', $tabLength) : "\t";
-			$spacePostfix = $useSpaces || self::$spacesAfterKey;
+			$spacePostfix = $useSpaces || $this->spacesAfterKey;
 
 
 			// The overall indent
@@ -174,14 +201,14 @@ class PhpGen
 
 			$maxKeyLength   = 0;
 			$arrayCodeParts = [];
-			$arrayIsSimple  = !self::$outputSerialKeys;
+			$arrayIsSimple  = !$this->outputSerialKeys;
 			$i = 0;
 			foreach ($array as $key => $val) {
 				if ($arrayIsSimple && $key !== $i++) {
 					$arrayIsSimple = false;
 				}
-				$key        = self::getCode($key, 0, true, true);
-				$val        = self::getCode($val, $indent+1, $noFormat, true);
+				$key        = $this->getCode($key, 0, true, true);
+				$val        = $this->getCode($val, $indent+1, $noFormat, true);
 				$valIsArray = is_array($val) && $val;
 				$keyLength  = 0;
 				if (!$noFormat) {
@@ -258,10 +285,8 @@ class PhpGen
 			$string .= $code;
 		}
 
-		$string .= self::$shortArraySyntax ? ']' : ')';
+		$string .= $this->shortArraySyntax ? ']' : ')';
 
 		return $string;
 	}
 }
-
-PhpGen::$shortArraySyntax = version_compare(PHP_VERSION, '5.4.0', '>=');
