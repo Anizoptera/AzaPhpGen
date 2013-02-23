@@ -33,7 +33,10 @@ class PhpGen
 
 	/**
 	 * Output string variables as one line.
-	 * Converts \n and \r symbols to escaped characters.
+	 * Converts \n and \t symbols to escaped characters.
+	 *
+	 * By default only other control and non-visible
+	 * chars are escaped.
 	 */
 	public $oneLineStrings = false;
 
@@ -145,16 +148,47 @@ class PhpGen
 			return $this->getObject($data) . $tail;
 		}
 		// String
-		// TODO: Test for chars with all ASCII chars
-		if ($this->oneLineStrings
-		    && (false !== strpos($data, "\n")
-		        || false !== strpos($data, "\r"))
-		) {
-			$data = addcslashes($data, '"$\\');
-			$data = str_replace(["\n", "\r"], ['\n', '\r'], $data);
-			return '"' . $data . '"' . $tail;
-		}
-		return "'" . addcslashes($data, "'\\") . "'" . $tail;
+		// http://php.net/language.types.string#language.types.string.syntax.double
+		$regexp = $this->oneLineStrings
+				? '\x00-\x1F'
+				: '\x00-\x08\x0B-\x1F';
+		$data = preg_replace_callback(
+			'~['.$regexp.'\x22\x24\x5C\x7F]~SX',
+			function($char) {
+				// linefeed (LF or 0x0A (10) in ASCII)
+				if ("\n" === ($char = $char[0])) {
+					return '\n';
+				}
+				// carriage return (CR or 0x0D (13) in ASCII)
+				else if ("\r" === $char) {
+					return '\r';
+				}
+				// horizontal tab (HT or 0x09 (9) in ASCII)
+				else if ("\t" === $char) {
+					return '\t';
+				}
+				// vertical tab (VT or 0x0B (11) in ASCII) (since PHP 5.2.5)
+				else if ("\v" === $char) {
+					return '\v';
+				}
+				// escape (ESC or 0x1B (27) in ASCII) (since PHP 5.4.0)
+//					else if ("\e" === $char) {
+//						return '\e';
+//					}
+				// form feed (FF or 0x0C (12) in ASCII) (since PHP 5.2.5)
+				else if ("\f" === $char) {
+					return '\f';
+				}
+				// chars that must be escaped in a double-quoted string
+				else if ('\\' === $char || '$' === $char || '"' === $char) {
+					return "\\$char";
+				}
+				// all other chars
+				return sprintf('\x%02X', ord($char));
+			},
+			$data
+		);
+		return '"' . $data . '"' . $tail;
 	}
 
 

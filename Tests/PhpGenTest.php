@@ -33,7 +33,7 @@ class PhpGenTest extends TestCase
 	{
 		// Preparations
 		$this->precision = ini_get('precision');
-		$this->phpGen    = PhpGen::instance();
+		$this->phpGen    = new PhpGen();
 	}
 
 	/**
@@ -48,6 +48,26 @@ class PhpGenTest extends TestCase
 		$this->precision =  $this->phpGen = null;
 	}
 
+
+	/**
+	 * Tests PhpGen singleton
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testInstance()
+	{
+		$phpGen   = $this->phpGen;
+		$instance = PhpGen::instance();
+
+		$this->assertNotSame($phpGen, $instance);
+		$this->assertSame($instance, PhpGen::instance());
+
+		$this->assertSame(
+			version_compare(PHP_VERSION, '5.4.0', '>='),
+			$instance->shortArraySyntax
+		);
+	}
 
 
 	/**
@@ -361,5 +381,126 @@ class PhpGenTest extends TestCase
 		$var = 99999.99999;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('99999.99999;', $result);
+	}
+
+	/**
+	 * Tests code generation for String type
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testString()
+	{
+		$phpGen = $this->phpGen;
+
+		$var1 = 'example';
+		$var2 = 'example $var';
+		$var3 = "\n\t\r\0\1\2\3\4\5\6\7'\"\$v";
+		for ($i = 0, $var4 = ''; $i < 128; $i++) $var4 .= chr($i); // ASCII
+		for ($i = 0, $var5 = ''; $i < 256; $i++) $var5 .= chr($i); // 0x00-0xFF
+		$var6 = <<<TXT
+The recommended way to install AzaPhpGen is [through composer](http://getcomposer.org).
+You can see [package information on Packagist.](https://packagist.org/packages/aza/phpgen)
+
+```JSON
+{
+	"require": {
+		"aza/phpgen": "~1.0"
+	}
+}
+```
+TXT;
+
+
+		// ----
+		$phpGen->oneLineStrings = false;
+
+		$result = $phpGen->getCode($var1);
+		$this->assertSame($var1, eval("return $result"));
+		$this->assertSame('"example";', $result);
+
+		$result = $phpGen->getCode($var2);
+		$this->assertSame($var2, eval("return $result"));
+		$this->assertSame('"example \\$var";', $result);
+
+		$result = $phpGen->getCode($var3);
+		$this->assertSame($var3, eval("return $result"));
+		$this->assertSame(
+			'"
+	\r\x00\x01\x02\x03\x04\x05\x06\x07\'\\"\\$v";',
+			$result
+		);
+
+		$result = $phpGen->getCode($var4);
+		$this->assertSame($var4, eval("return $result"));
+		$this->assertSame(
+			"\"\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08"
+				."\t\n\\v\\f\\r"
+				."\\x0E\\x0F\\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1A\\x1B\\x1C\\x1D\\x1E\\x1F"
+				." !\\\"#\\$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x7F"
+			."\";",
+			$result
+		);
+
+		$result = $phpGen->getCode($var5);
+		$this->assertSame($var5, eval("return $result"));
+
+		$result = $phpGen->getCode($var6);
+		$this->assertSame($var6, eval("return $result"));
+		$this->assertSame(
+			'"The recommended way to install AzaPhpGen is [through composer](http://getcomposer.org).
+You can see [package information on Packagist.](https://packagist.org/packages/aza/phpgen)
+
+```JSON
+{
+	\"require\": {
+		\"aza/phpgen\": \"~1.0\"
+	}
+}
+```";',
+			$result
+		);
+
+
+		// ----
+		$phpGen->oneLineStrings = true;
+
+		$result = $phpGen->getCode($var1);
+		$this->assertSame($var1, eval("return $result"));
+		$this->assertSame('"example";', $result);
+
+		$result = $phpGen->getCode($var2);
+		$this->assertSame($var2, eval("return $result"));
+		$this->assertSame('"example \\$var";', $result);
+
+		$result = $phpGen->getCode($var3);
+		$this->assertSame($var3, eval("return $result"));
+		$this->assertSame(
+			'"\n\t\r\x00\x01\x02\x03\x04\x05\x06\x07\'\\"\\$v";',
+			$result
+		);
+
+		$result = $phpGen->getCode($var4);
+		$this->assertSame($var4, eval("return $result"));
+		$this->assertSame(
+			"\"\\x00\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08"
+			."\\t\\n\\v\\f\\r"
+			."\\x0E\\x0F\\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1A\\x1B\\x1C\\x1D\\x1E\\x1F"
+			." !\\\"#\\$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x7F"
+			."\";",
+			$result
+		);
+
+		$result = $phpGen->getCode($var5);
+		$this->assertSame($var5, eval("return $result"));
+
+		$result = $phpGen->getCode($var6);
+		$this->assertSame($var6, eval("return $result"));
+		$this->assertSame(
+			'"The recommended way to install AzaPhpGen is [through composer](http://getcomposer.org).\n'
+			.'You can see [package information on Packagist.](https://packagist.org/packages/aza/phpgen)\n\n'
+			.'```JSON\n{\n\t\"require\": {\n\t\t\"aza/phpgen\": \"~1.0\"\n\t}\n}\n```";',
+			$result
+		);
 	}
 }
