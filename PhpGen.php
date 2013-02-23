@@ -1,10 +1,15 @@
 <?php
 
 namespace Aza\Components\PhpGen;
+use ReflectionFunction;
+use SplFileObject;
 use Traversable;
 
 /**
  * PHP code generation
+ *
+ * @uses reflection
+ * @uses spl
  *
  * @project Anizoptera CMF
  * @package system.phpgen
@@ -50,6 +55,13 @@ class PhpGen
 	 */
 	public $shortArraySyntax = false;
 
+	/**
+	 * Array of different custom type handlers.
+	 *
+	 * @var array[]
+	 */
+	protected $customHandlers = array();
+
 
 	// TODO: В массивах если значение-массив разрывает список, то можно отступы до и после него рассчитывать отдельно
 	// TODO: Cover with tests
@@ -73,6 +85,22 @@ class PhpGen
 	public function __construct()
 	{
 		$this->shortArraySyntax = version_compare(PHP_VERSION, '5.4.0', '>=');
+	}
+
+
+	/**
+	 * Adds custom handler for the specified object type
+	 *
+	 * @param string|object $type <p>
+	 * Object type for instanceof check
+	 * </p>
+	 * @param callable $handler <p>
+	 * Callback "string fun($object)"
+	 * </p>
+	 */
+	public function addCustomHandler($type, $handler)
+	{
+		$this->customHandlers[] = [$type, $handler];
 	}
 
 
@@ -140,12 +168,15 @@ class PhpGen
 			return var_export($data, true) . $tail;
 		}
 		// Array
-		else if (is_array($data) || $data instanceof \Traversable) {
+		else if (($traversable = ($data instanceof \Traversable)) || is_array($data)) {
+			if ($traversable) {
+				$data = iterator_to_array($data, true);
+			}
 			return $this->getArray($data, $indent, $noFormat) . $tail;
 		}
 		// Object
 		else if (is_object($data)) {
-			return $this->getObject($data) . $tail;
+			return $this->getObject($data, $indent, $noFormat) . $tail;
 		}
 		// String
 		// http://php.net/language.types.string#language.types.string.syntax.double
@@ -186,7 +217,7 @@ class PhpGen
 				// all other chars
 				return sprintf('\x%02X', ord($char));
 			},
-			$data
+			(string)$data
 		);
 		return '"' . $data . '"' . $tail;
 	}
@@ -195,26 +226,71 @@ class PhpGen
 	/**
 	 * Returns php code for object
 	 *
-	 * @param object|IPhpGenerable $object Object data
+	 * @see IPhpGenerable
+	 * @see CustomCode
+	 *
+	 * @param object|IPhpGenerable $object <p>
+	 * Object data
+	 * </p>
 	 *
 	 * @return string
 	 */
 	protected function getObject($object)
 	{
-		// TODO: Closure support
+		// User custom code
 		if ($object instanceof IPhpGenerable) {
 			return $object->generateCode();
 		}
-		$code = $this->getCode(serialize($object));
-		return "unserialize({$code})";
+		// Closures special (partial) support
+		// WARNING: many closures on one line are not supported
+		// WARNING: closures with "use" are not supported
+		else if ($object instanceof \Closure) {
+			$ref = new ReflectionFunction($object);
+
+			// Open file and seek to the first line of the closure
+			$file = new SplFileObject($ref->getFileName());
+			$file->seek($ref->getStartLine()-1);
+
+			// Retrieve all of the lines that contain code for the closure
+			$endLine = $ref->getEndLine();
+			$code    = '';
+			while ($file->key() < $endLine) {
+				$code .= $file->current();
+				$file->next();
+			}
+
+			// Only keep the code defining that closure
+			$begin = stripos($code, 'function');
+			$end   = strrpos($code, '}');
+			$code  = substr($code, $begin, $end - $begin + 1);
+
+			return $code;
+		}
+		// Different custom handlers
+		else if ($handlers = $this->customHandlers) {
+			foreach ($handlers as $h) {
+				list($type, $handler) = $h;
+				if ($object instanceof $type) {
+					return $handler($object);
+				}
+			}
+		}
+		// Default - serialization
+		return "unserialize({$this->getCodeNoTail(serialize($object))})";
 	}
 
 	/**
 	 * Returns php code for array
 	 *
-	 * @param array|Traversable $array    Array data
-	 * @param int               $indent   Indent size in tabs for array php code
-	 * @param bool              $noFormat No formatting and indention
+	 * @param array|Traversable $array <p>
+	 * Array data
+	 * </p>
+	 * @param int $indent [optional] <p>
+	 * Indent size in tabs for array php code
+	 * </p>
+	 * @param bool $noFormat [optional] <p>
+	 * No formatting and indention
+	 * </p>
 	 *
 	 * @return string
 	 */

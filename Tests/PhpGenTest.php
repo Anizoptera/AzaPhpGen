@@ -1,6 +1,8 @@
 <?php
 
 namespace Aza\Components\PhpGen\Tests;
+use Aza\Components\PhpGen\CustomCode;
+use Aza\Components\PhpGen\IPhpGenerable;
 use Aza\Components\PhpGen\PhpGen;
 use PHPUnit_Framework_TestCase as TestCase;
 
@@ -12,6 +14,7 @@ use PHPUnit_Framework_TestCase as TestCase;
  *
  * @covers Aza\Components\PhpGen\PhpGen
  * @covers Aza\Components\PhpGen\IPhpGenerable
+ * @covers Aza\Components\PhpGen\CustomCode
  */
 class PhpGenTest extends TestCase
 {
@@ -85,6 +88,7 @@ class PhpGenTest extends TestCase
 		// ----
 		$result = $phpGen->getCode($var);
 		$this->assertSame('null;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 
 		// ----
@@ -132,6 +136,7 @@ class PhpGenTest extends TestCase
 		// ----
 		$result = $phpGen->getCode($var);
 		$this->assertSame('true;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 
 		// ----
@@ -171,6 +176,7 @@ class PhpGenTest extends TestCase
 		// ----
 		$result = $phpGen->getCode($var);
 		$this->assertSame('false;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 
 		// ----
@@ -218,6 +224,7 @@ class PhpGenTest extends TestCase
 		// ----
 		$result = $phpGen->getCode($var);
 		$this->assertSame('1234567;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 
 		// ----
@@ -256,26 +263,31 @@ class PhpGenTest extends TestCase
 		$var = 0;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('0;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 		// ----
 		$var = -123;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('-123;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 		// ----
 		$var = 0x123;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('291;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 		// ----
 		$var = 0123;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('83;', $result);
+		$this->assertSame($var, eval("return $result"));
 
 		// ----
 		$var = 9999999999;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('9999999999;', $result);
+		$this->assertSame($var, eval("return $result"));
 	}
 
 	/**
@@ -317,6 +329,7 @@ class PhpGenTest extends TestCase
 		ini_set('precision', 16);
 		$result = $phpGen->getCode($var);
 		$this->assertSame('1234.5678;', $result);
+		$this->assertSame($var, eval("return $result"));
 		$result = $phpGen->getCode(1.0E+3);
 		$this->assertSame('1000;', $result);
 		$result = $phpGen->getCode(1.0E+6);
@@ -502,5 +515,172 @@ You can see [package information on Packagist.](https://packagist.org/packages/a
 			.'```JSON\n{\n\t\"require\": {\n\t\t\"aza/phpgen\": \"~1.0\"\n\t}\n}\n```";',
 			$result
 		);
+	}
+
+	/**
+	 * Tests code generation for String type
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testObject()
+	{
+		$phpGen = $this->phpGen;
+
+		$var = new \stdClass();
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertEquals($var, $evaled_result);
+		$this->assertSame('unserialize("O:8:\"stdClass\":0:{}");', $result);
+
+		$var = (object)array();
+		$result = $phpGen->getCode($var);
+		$this->assertSame('unserialize("O:8:\"stdClass\":0:{}");', $result);
+
+		$var = (object)array('a' => 1, 'b' => 2);
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertEquals($var, $evaled_result);
+		$this->assertSame(
+			'unserialize("O:8:\"stdClass\":2:{s:1:\"a\";i:1;s:1:\"b\";i:2;}");',
+			$result
+		);
+
+		$var = new \DateTime('2013-02-23 00:49:36', new \DateTimeZone('UTC'));
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertTrue($evaled_result instanceof $var);
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertEquals($var, $evaled_result);
+		$this->assertSame(
+			'unserialize("O:8:\"DateTime\":3:{s:4:\"date\";s:19:\"2013-02-23 00:49:36\";s:13:\"timezone_type\";i:3;s:8:\"timezone\";s:3:\"UTC\";}");',
+			$result
+		);
+	}
+
+	/**
+	 * Tests code generation for Closure type
+	 *
+	 * @author amal
+	 * @group unit
+	 *
+	 * @requires extension reflection
+	 * @requires extension spl
+	 */
+	public function testClosure()
+	{
+		$phpGen = $this->phpGen;
+
+
+		$var = function($a, $b) {
+			return $a + $b;
+		};
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertTrue($evaled_result instanceof $var);
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertEquals($var, $evaled_result);
+		$this->assertSame('function($a, $b) {
+			return $a + $b;
+		};', $result);
+
+
+		$var = function() {
+			return round(1, 100) . "example\t\n";
+		};
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertTrue($evaled_result instanceof $var);
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertEquals($var, $evaled_result);
+		$this->assertSame('function() {
+			return round(1, 100) . "example\t\n";
+		};', $result);
+		$this->assertSame('function() {
+			return round(1, 100) . "example\t\n";
+		};', $phpGen->getCodeNoFormat($var));
+		$this->assertSame('function() {
+			return round(1, 100) . "example\t\n";
+		}', $phpGen->getCodeNoTail($var));
+	}
+
+	/**
+	 * Tests custom code generation
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testCustomCode()
+	{
+		$phpGen = $this->phpGen;
+
+		$code = '2+5';
+		$var = new CustomCode($code);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(7, eval("return $result"));
+		$this->assertSame("$code;", $result);
+
+		$result = $phpGen->getCodeNoTail($var);
+		$this->assertSame(7, eval("return $result;"));
+		$this->assertSame($code, $result);
+		$this->assertSame($var->generateCode(), $result);
+
+		$code = 'DIRECTORY_SEPARATOR . "someFile." . (13-7)';
+		$var = new CustomCode($code);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(DIRECTORY_SEPARATOR . 'someFile.6', eval("return $result"));
+		$this->assertSame("$code;", $result);
+
+
+		$var = new _ExampleCustomCode();
+		$this->assertSame("{$var->generateCode()};", $phpGen->getCode($var));
+		$this->assertSame("{$var->generateCode()};", $phpGen->getCodeNoFormat($var));
+		$this->assertSame($var->generateCode(), $phpGen->getCodeNoTail($var));
+	}
+
+	/**
+	 * Tests custom code generation
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testCustomHandlers()
+	{
+		$phpGen = $this->phpGen;
+
+		$phpGen->addCustomHandler('DateTime', function($data) use ($phpGen) {
+			/** @var $data \DateTime */
+			return $phpGen->getCodeNoTail(
+				$data->format("Y-m-d\TH:i:sO")
+			);
+		});
+
+		$var = new \DateTime('2013-02-23 00:49:36', new \DateTimeZone('UTC'));
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertFalse($evaled_result instanceof $var);
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertNotEquals($var, $evaled_result);
+		$this->assertSame(
+			'"2013-02-23T00:49:36+0000";',
+			$result
+		);
+	}
+}
+
+
+/**
+ *
+ */
+class _ExampleCustomCode implements IPhpGenerable
+{
+	/**
+	 * {@inheritdoc}
+	 */
+	public function generateCode()
+	{
+		return '32434544565768879789';
 	}
 }

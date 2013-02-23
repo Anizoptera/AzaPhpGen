@@ -3,7 +3,8 @@
 namespace Aza\Components\PhpGen;
 
 /**
- * Interface for classes that can be translated into php code by {@link PhpGen}
+ * Interface for classes that can be translated into php code by {@link PhpGen}.
+ * See {@link CustomCode} for example.
  *
  * @project Anizoptera CMF
  * @package system.phpgen
