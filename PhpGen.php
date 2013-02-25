@@ -92,7 +92,7 @@ class PhpGen
 	 */
 	public function __construct()
 	{
-		$this->shortArraySyntax = version_compare(PHP_VERSION, '5.4.0', '>=');
+		$this->shortArraySyntax = version_compare(PHP_VERSION, '5.4', '>=');
 	}
 
 

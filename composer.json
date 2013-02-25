@@ -18,7 +18,8 @@
 	},
 	"suggest": {
 		"ext-reflection": "Used for closure support",
-		"ext-spl":        "Used for closure support"
+		"ext-spl":        "Used for closure support",
+		"aza/benchmark":  "Used in benchmark tests"
 	},
 	"autoload": {
 		"psr-0": {
