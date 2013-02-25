@@ -56,16 +56,24 @@ class PhpGen
 	public $shortArraySyntax = false;
 
 	/**
+	 * If array value breaks the list (multiline),
+	 * alignment before and after calculated separately
+	 */
+	public $alignMultilineBreaks = true;
+
+	/**
+	 * Approximate maximum line length
+	 */
+	public $maxLineLength = 60;
+
+
+	/**
 	 * Array of different custom type handlers.
 	 *
 	 * @var array[]
 	 */
 	protected $customHandlers = array();
 
-
-	// TODO: В массивах если значение-массив разрывает список, то можно отступы до и после него рассчитывать отдельно
-	// TODO: Cover with tests
-	// TODO: Basic class CustomCode implementing IPhpGenerable
 
 
 	/**
@@ -100,7 +108,7 @@ class PhpGen
 	 */
 	public function addCustomHandler($type, $handler)
 	{
-		$this->customHandlers[] = [$type, $handler];
+		$this->customHandlers[] = array($type, $handler);
 	}
 
 
@@ -168,7 +176,7 @@ class PhpGen
 			return var_export($data, true) . $tail;
 		}
 		// Array
-		else if (($traversable = ($data instanceof \Traversable)) || is_array($data)) {
+		else if (($traversable = ($data instanceof Traversable)) || is_array($data)) {
 			if ($traversable) {
 				$data = iterator_to_array($data, true);
 			}
@@ -296,107 +304,158 @@ class PhpGen
 	 */
 	protected function getArray($array, $indent = 0, $noFormat = false)
 	{
-		$string = $this->shortArraySyntax ? '[' : 'array(';
+		$shortSyntax = $this->shortArraySyntax;
+		$resultCode  = $shortSyntax ? '[' : 'array(';
 
 		if ($array) {
-			$tabLength    = (int)$this->tabLength;
-			$mixSpaces    = (bool)$this->mixSpaces;
+			$newLine      = "\n";
+			$tabLength    = $this->tabLength;
+			$mixSpaces    = $this->mixSpaces;
 			$useSpaces    = $this->useSpaces;
 			$tab          = $useSpaces ? str_repeat(' ', $tabLength) : "\t";
 			$spacePostfix = $useSpaces || $this->spacesAfterKey;
-
+			$alignBreaks  = $this->alignMultilineBreaks;
 
 			// The overall indent
 			$indentString = $noFormat ? '' : str_repeat($tab, $indent);
 
-			$maxKeyLength   = 0;
-			$arrayCodeParts = [];
-			$arrayIsSimple  = !$this->outputSerialKeys;
-			$i = 0;
+			// First calculations and code build for keys/values
+			$keyLength = $keyLengthBlock = $i = 0;
+			$maxKeyLenBlocks = array($keyLengthBlock => 0);
+			$maxKeyLength    = &$maxKeyLenBlocks[$keyLengthBlock];
+			$arrayIsSimple   = !$this->outputSerialKeys;
+			$multiline       = false;
+			$arrayParts      = array();
 			foreach ($array as $key => $val) {
 				if ($arrayIsSimple && $key !== $i++) {
 					$arrayIsSimple = false;
 				}
-				$key        = $this->getCode($key, 0, true, true);
-				$val        = $this->getCode($val, $indent+1, $noFormat, true);
-				$valIsArray = is_array($val) && $val;
-				$keyLength  = 0;
+
+				// Build code for keys and values
+				$key = $this->getCode($key, 0, true, true);
+				$val = $this->getCode($val, $indent+1, $noFormat, true);
+
+				// We don't need this information if formatting is disabled
 				if (!$noFormat) {
+					// We need to save maximum key code length for alignment
 					$keyLength = mb_strlen($key, 'UTF-8');
 					$keyLength > $maxKeyLength
 						&& $maxKeyLength = $keyLength;
+
+					// Multiline value breaks the list, so
+					// alignment before and after calculated separately
+					if ($multiline = $alignBreaks
+							? false !== strpos($val, $newLine)
+							: false
+					) {
+						$maxKeyLenBlocks[++$keyLengthBlock] = 0;
+						$maxKeyLength = &$maxKeyLenBlocks[$keyLengthBlock];
+					}
 				}
-				$arrayCodeParts[] = array(
+
+				$arrayParts[] = array(
 					$key,
 					$val,
 					$keyLength,
-					$valIsArray
+					$multiline
 				);
 			}
-			unset($array, $key, $val);
+			unset($array, $maxKeyLength);
 
-			foreach ($arrayCodeParts as &$data) {
-				list($key, $val, $keyLength, $valIsArray) = $data;
+			// Disable formatting if array have only one serial value
+			// (not multiline and not too long)
+			if ($arrayIsSimple && !$noFormat && count($arrayParts) === 1
+			    && !$arrayParts[0][3]
+			    && $this->maxLineLength >= mb_strlen($arrayParts[0][1], 'UTF-8')
+			                               + ($indent*$tabLength)
+			) {
+				$noFormat = true;
+			}
+
+			// Build code
+			$keyLengthBlock = 0;
+			$maxKeyLength   = $maxKeyLenBlocks[$keyLengthBlock];
+			foreach ($arrayParts as &$data) {
+				list(
+					$key,
+					$val,
+					$keyLength,
+					$multiline
+				) = $data;
+
 				if (!$noFormat) {
-					if ($valIsArray) {
-						$key .= ' ';
-					} else {
-						$indentLength = $maxKeyLength - $keyLength + 1;
-						if ($spacePostfix) {
-							$key .= str_repeat(' ', $indentLength);
-						} else {
-							$curTabTail = (($indent+1) * $tabLength + $keyLength) % $tabLength;
-							if ($mixSpaces) {
-								if ($indentLength < ($curTabTail ?: $tabLength)) {
-									$key .= str_repeat(' ', $indentLength);
-								} else {
-									if ($curTabTail && $indentLength >= $curTabTail) {
-										$key .= $tab;
-										$indentLength -= $curTabTail;
-									}
-									if ($indentLength > 0) {
-										$indentTail = $indentLength % $tabLength;
-										$indentLength -= $indentTail;
-										if ($indentLength) {
-											$key .= str_repeat($tab, $indentLength);
-										}
-										if ($indentTail) {
-											$key .= str_repeat(' ', $indentTail);
-										}
-									}
+					// Full align length in chars (after key, before value)
+					$alignLength = $maxKeyLength - $keyLength + 1;
+
+					// Simple spaces alignment
+					if ($spacePostfix) {
+						$key .= str_repeat(' ', $alignLength);
+					}
+
+					// Tabs with mix of spaces alignment (for shortness)
+					else if ($mixSpaces) {
+						if ($curTabTail = $keyLength % $tabLength) {
+							$curTabTail = $tabLength-$curTabTail;
+						}
+						$alignTail = $alignLength % $tabLength;
+						if ($curTabTail <= $alignTail
+							|| $alignLength / $tabLength >= 1
+						) {
+							if ($curTabTail) {
+								$key         .= $tab;
+								$alignLength -= $curTabTail;
+							}
+							if ($alignLength) {
+								if ($align = floor($alignLength / $tabLength)) {
+									$key .= str_repeat($tab, $align);
 								}
+								$alignTail = $alignLength % $tabLength;
 							} else {
-								if ($curTabTail) {
-									$key .= $tab;
-									$indentLength -= $curTabTail;
-								}
-								if ($indentLength > 0) {
-									$key .= str_repeat($tab, ceil($indentLength/$tabLength));
-								}
+								$alignTail = 0;
 							}
 						}
+						if ($alignTail) {
+							$key .= str_repeat(' ', $alignTail);
+						}
+					}
+
+					// Only tabs alignment
+					else {
+						if ($curTabTail = $keyLength % $tabLength) {
+							$key         .= $tab;
+							$alignLength -= $tabLength-$curTabTail;
+						}
+						$key .= str_repeat(
+							$tab,
+							ceil($alignLength / $tabLength)
+						);
+					}
+
+					// Different align before and after multiline value
+					if ($multiline) {
+						$maxKeyLength = $maxKeyLenBlocks[++$keyLengthBlock];
 					}
 				}
+
 				$data = ($arrayIsSimple
 							? ''
 							: $key . '=>' . ($noFormat ? '' : ' ')
-						) . $val . ',';
+				        ) . $val . ',';
 			}
 
+			// Join code parts
 			if ($noFormat) {
-				$code = join('', $arrayCodeParts);
-				$code = substr($code, 0, -1);
+				$resultCode .= join('', $arrayParts);
+				$resultCode  = substr($resultCode, 0, -1);
 			} else {
-				$code = "\n{$indentString}{$tab}"
-						. join("\n{$indentString}{$tab}", $arrayCodeParts)
-						. "\n{$indentString}";
+				$resultCode .= "{$newLine}{$indentString}{$tab}"
+						. join("{$newLine}{$indentString}{$tab}", $arrayParts)
+						. "{$newLine}{$indentString}";
 			}
-
-			$string .= $code;
 		}
 
-		$string .= $this->shortArraySyntax ? ']' : ')';
+		$resultCode .= $shortSyntax ? ']' : ')';
 
-		return $string;
+		return $resultCode;
 	}
 }

@@ -5,6 +5,7 @@ vendor/
 
 # PhpUnit
 phpunit.xml
+code_coverage/
 
 # Ignore IDE settings
 *.iml

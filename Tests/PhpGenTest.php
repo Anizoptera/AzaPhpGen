@@ -5,6 +5,7 @@ use Aza\Components\PhpGen\CustomCode;
 use Aza\Components\PhpGen\IPhpGenerable;
 use Aza\Components\PhpGen\PhpGen;
 use PHPUnit_Framework_TestCase as TestCase;
+use SplFixedArray;
 
 /**
  * Testing PHP code generation
@@ -21,7 +22,12 @@ class PhpGenTest extends TestCase
 	/**
 	 * @var int
 	 */
-	protected $precision;
+	protected static $defaultPrecision;
+
+	/**
+	 * @var bool
+	 */
+	protected static $canUseShortSyntax;
 
 	/**
 	 * @var PhpGen
@@ -32,11 +38,21 @@ class PhpGenTest extends TestCase
 	/**
 	 * {@inheritdoc}
 	 */
-	protected function setUp()
+	public static function setUpBeforeClass()
 	{
 		// Preparations
-		$this->precision = ini_get('precision');
-		$this->phpGen    = new PhpGen();
+		self::$defaultPrecision  = ini_get('precision');
+		self::$canUseShortSyntax = version_compare(PHP_VERSION, '5.4.0', '>=');
+	}
+
+	/**
+	 * {@inheritdoc}
+	 */
+	protected function setUp()
+	{
+		// PhpGen instance with default settings
+		$this->phpGen = new PhpGen();
+		$this->phpGen->shortArraySyntax = true;
 	}
 
 	/**
@@ -44,12 +60,11 @@ class PhpGenTest extends TestCase
 	 */
 	protected function tearDown()
 	{
-		// Restore precision
-		ini_set('precision', $this->precision);
-
 		// Cleanup
-		$this->precision =  $this->phpGen = null;
+		$this->phpGen = null;
+		ini_set('precision', self::$defaultPrecision);
 	}
+
 
 
 	/**
@@ -60,15 +75,24 @@ class PhpGenTest extends TestCase
 	 */
 	public function testInstance()
 	{
-		$phpGen   = $this->phpGen;
 		$instance = PhpGen::instance();
+		$this->assertNotSame($this->phpGen, $instance);
+		$this->assertTrue($this->phpGen instanceof $instance);
+		$this->assertSame(PhpGen::instance(), $instance);
+	}
 
-		$this->assertNotSame($phpGen, $instance);
-		$this->assertSame($instance, PhpGen::instance());
-
+	/**
+	 * Tests short array syntax support check
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testShortArraySyntaxCheck()
+	{
+		$phpGen = new PhpGen();
 		$this->assertSame(
-			version_compare(PHP_VERSION, '5.4.0', '>='),
-			$instance->shortArraySyntax
+			self::$canUseShortSyntax,
+			$phpGen->shortArraySyntax
 		);
 	}
 
@@ -517,6 +541,7 @@ You can see [package information on Packagist.](https://packagist.org/packages/a
 		);
 	}
 
+
 	/**
 	 * Tests code generation for String type
 	 *
@@ -665,6 +690,1154 @@ You can see [package information on Packagist.](https://packagist.org/packages/a
 		$this->assertNotEquals($var, $evaled_result);
 		$this->assertSame(
 			'"2013-02-23T00:49:36+0000";',
+			$result
+		);
+
+		$var = new \DateTimeZone('UTC');
+		$result = $phpGen->getCode($var);
+		$evaled_result = eval("return $result");
+		$this->assertTrue($evaled_result instanceof $var);
+		$this->assertNotSame($var, $evaled_result);
+		$this->assertEquals($var, $evaled_result);
+		$this->assertSame(
+			'unserialize("O:12:\"DateTimeZone\":0:{}");',
+			$result
+		);
+	}
+
+
+	/**
+	 * Tests code generation for Array type
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray()
+	{
+		$phpGen = $this->phpGen;
+
+		$canUseShortSyntax = self::$canUseShortSyntax;
+
+		$var = array();
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame('[];', $result);
+
+		$var = array(0, 1, 2, 3);
+		$result = $phpGen->getCodeNoFormat($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame('[0,1,2,3];', $result);
+
+		$var = array(0, 'a', false, true, null);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	0,
+	"a",
+	false,
+	true,
+	null,
+];',
+			$result
+		);
+
+		$result = $phpGen->getCodeNoFormat($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame('[0,"a",false,true,null];', $result);
+
+		$var = array('1' => 0, 1, 2, 3);
+		$result = $phpGen->getCodeNoFormat($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame('[1=>0,2=>1,3=>2,4=>3];', $result);
+
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	1 => 0,
+	2 => 1,
+	3 => 2,
+	4 => 3,
+];',
+			$result
+		);
+
+		$result = $phpGen->getCodeNoTail($var, 3);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result;"));
+		}
+		$this->assertSame(
+			'[
+				1 => 0,
+				2 => 1,
+				3 => 2,
+				4 => 3,
+			]',
+			$result
+		);
+
+		$var = array('abc' => 0, 1, 2, 3);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"abc" => 0,
+	0     => 1,
+	1     => 2,
+	2     => 3,
+];',
+			$result
+		);
+
+		$var = array('abc' => 0, 1, 2, 'abcdefg _-' => 3);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"abc"        => 0,
+	0            => 1,
+	1            => 2,
+	"abcdefg _-" => 3,
+];',
+			$result
+		);
+
+		$var = array('abc' => 0, 1, array());
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"abc" => 0,
+	0     => 1,
+	1     => [],
+];',
+			$result
+		);
+
+		$var = array(null => array(array(array())));
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"" => [[[]]],
+];',
+			$result
+		);
+
+		$var = array('z' => array(1, array(array())));
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"z" => [
+		1,
+		[[]],
+	],
+];',
+			$result
+		);
+
+		$var = array(array());
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[[]];',
+			$result
+		);
+
+		$var = array('sdfqergeger45hy4h5wg4w');
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'["sdfqergeger45hy4h5wg4w"];',
+			$result
+		);
+
+		$var = array('sdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4w');
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"sdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4w",
+];',
+			$result
+		);
+
+		$var = array("sdfqergeg\ner45hy4h5wg4w");
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"sdfqergeg
+er45hy4h5wg4w",
+];',
+			$result
+		);
+
+		$var = array(
+			"URL_ALL"       => "http://example.com/",
+			"DOMAIN_ALL"    => "example.com",
+			"DOMAIN_STATIC" => "assets.example.com",
+			"DIR_LOAD"      => "/apps/example/application/load/public/",
+		);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"URL_ALL"       => "http://example.com/",
+	"DOMAIN_ALL"    => "example.com",
+	"DOMAIN_STATIC" => "assets.example.com",
+	"DIR_LOAD"      => "/apps/example/application/load/public/",
+];',
+			$result
+		);
+
+		$var = array(
+			""           => "1",
+			"1"          => "1",
+			"12"         => "1",
+			"123"        => "1",
+			"1234"       => "1",
+			"12345"      => "1",
+			"123456"     => "1",
+			"1234567"    => "1",
+			"12345678"   => "1",
+			"123456789"  => "1",
+			"1234567890" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	""         => "1",
+	1          => "1",
+	12         => "1",
+	123        => "1",
+	1234       => "1",
+	12345      => "1",
+	123456     => "1",
+	1234567    => "1",
+	12345678   => "1",
+	123456789  => "1",
+	1234567890 => "1",
+];',
+			$result
+		);
+
+		$var = array(
+			"DOMAIN_ALL"     => "example.com",
+			"DOMAIN_STATIC_" => "assets.example.com",
+			"123"            => array(1, 2),
+			"URL_ALL"        => "http://example.com/",
+			"DIR_LOAD"       => "/apps/example/application/load/public/",
+			"456"            => array(1, 2),
+			1                => 1,
+			2                => 1,
+		);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL"     => "example.com",
+	"DOMAIN_STATIC_" => "assets.example.com",
+	123              => [
+		1,
+		2,
+	],
+	"URL_ALL"  => "http://example.com/",
+	"DIR_LOAD" => "/apps/example/application/load/public/",
+	456        => [
+		1,
+		2,
+	],
+	1 => 1,
+	2 => 1,
+];',
+			$result
+		);
+
+		$var = array(
+			"DOMAIN_ALL"     => "example.com",
+			2                => 1,
+		);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL" => "example.com",
+	2            => 1,
+];',
+			$result
+		);
+
+		$var = array(
+			"DOMAIN_ALL"     => "example.com",
+			"az"             => "example\nexample",
+			2                => 1,
+		);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL" => "example.com",
+	"az"         => "example
+example",
+	2 => 1,
+];',
+			$result
+		);
+
+		$phpGen->oneLineStrings = true;
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL" => "example.com",
+	"az"         => "example\nexample",
+	2            => 1,
+];',
+			$result
+		);
+	}
+
+	/**
+	 * Tests code generation for SPL Traversable
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testTraversable()
+	{
+		$phpGen = $this->phpGen;
+
+		$var = new SplFixedArray(3);
+		$result = $phpGen->getCodeNoFormat($var);
+		$this->assertSame('[null,null,null];', $result);
+		$var[0] = 'a';
+		$var[1] = 'b';
+		$result = $phpGen->getCodeNoFormat($var);
+		$this->assertSame('["a","b",null];', $result);
+	}
+
+	/**
+	 * Tests code generation for Arrays with outputSerialKeys option enabled
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray_OtputSerialKeys()
+	{
+		$phpGen = $this->phpGen;
+		$phpGen->outputSerialKeys = true;
+
+		$canUseShortSyntax = self::$canUseShortSyntax;
+
+		$var = array(0, 1, 2, 3);
+		$result = $phpGen->getCodeNoFormat($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame('[0=>0,1=>1,2=>2,3=>3];', $result);
+
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	0 => 0,
+	1 => 1,
+	2 => 2,
+	3 => 3,
+];',
+			$result
+		);
+
+		$var = array('sdfqergeger45hy4h5wg4w');
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	0 => "sdfqergeger45hy4h5wg4w",
+];',
+			$result
+		);
+	}
+
+	/**
+	 * Tests code generation for Arrays with useSpaces option enabled
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray_UseSpaces()
+	{
+		$phpGen = $this->phpGen;
+		$phpGen->useSpaces = true;
+
+		$canUseShortSyntax = self::$canUseShortSyntax;
+
+		$var = array(
+			"DOMAIN_ALL"    => "example.com",
+			"DOMAIN_STATIC" => "assets.example.com",
+			"URL_ALL"       => "http://example.com/",
+			"DIR_LOAD"      => "/apps/example/application/load/public/",
+		);
+
+		$result = $phpGen->getCode($var, 1);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+        "DOMAIN_ALL"    => "example.com",
+        "DOMAIN_STATIC" => "assets.example.com",
+        "URL_ALL"       => "http://example.com/",
+        "DIR_LOAD"      => "/apps/example/application/load/public/",
+    ];',
+			$result
+		);
+
+		$phpGen->tabLength = 8;
+		$result = $phpGen->getCode($var, 2);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+                        "DOMAIN_ALL"    => "example.com",
+                        "DOMAIN_STATIC" => "assets.example.com",
+                        "URL_ALL"       => "http://example.com/",
+                        "DIR_LOAD"      => "/apps/example/application/load/public/",
+                ];',
+			$result
+		);
+
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+        "DOMAIN_ALL"    => "example.com",
+        "DOMAIN_STATIC" => "assets.example.com",
+        "URL_ALL"       => "http://example.com/",
+        "DIR_LOAD"      => "/apps/example/application/load/public/",
+];',
+			$result
+		);
+	}
+
+	/**
+	 * Tests code generation for Arrays with spacesAfterKey option disabled
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray_TabsAfterKey()
+	{
+		$phpGen = $this->phpGen;
+		$phpGen->spacesAfterKey = false;
+		$phpGen->mixSpaces      = false;
+
+		$canUseShortSyntax = self::$canUseShortSyntax;
+
+
+		$var1 = array(
+			"URL_ALL"       => "http://example.com/",
+			"DOMAIN_ALL"    => "example.com",
+			"DOMAIN_STATIC" => "assets.example.com",
+			"DIR_LOAD"      => "/apps/example/application/load/public/",
+		);
+		$result = $phpGen->getCode($var1);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var1, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"URL_ALL"		=> "http://example.com/",
+	"DOMAIN_ALL"	=> "example.com",
+	"DOMAIN_STATIC"	=> "assets.example.com",
+	"DIR_LOAD"		=> "/apps/example/application/load/public/",
+];',
+			$result
+		);
+
+		$var2 = array(
+			""           => "1",
+			"1"          => "1",
+			"12"         => "1",
+			"123"        => "1",
+			"1234"       => "1",
+			"12345"      => "1",
+			"123456"     => "1",
+			"1234567"    => "1",
+			"12345678"   => "1",
+			"123456789"  => "1",
+			"1234567890" => "1",
+		);
+		$result = $phpGen->getCode($var2);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var2, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	""			=> "1",
+	1			=> "1",
+	12			=> "1",
+	123			=> "1",
+	1234		=> "1",
+	12345		=> "1",
+	123456		=> "1",
+	1234567		=> "1",
+	12345678	=> "1",
+	123456789	=> "1",
+	1234567890	=> "1",
+];',
+			$result
+		);
+
+
+		$phpGen->mixSpaces = true;
+
+		$result = $phpGen->getCode($var1);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var1, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"URL_ALL"		=> "http://example.com/",
+	"DOMAIN_ALL"	=> "example.com",
+	"DOMAIN_STATIC"	=> "assets.example.com",
+	"DIR_LOAD"		=> "/apps/example/application/load/public/",
+];',
+			$result
+		);
+
+		$result = $phpGen->getCode($var2);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var2, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	""		   => "1",
+	1		   => "1",
+	12		   => "1",
+	123		   => "1",
+	1234	   => "1",
+	12345	   => "1",
+	123456	   => "1",
+	1234567	   => "1",
+	12345678   => "1",
+	123456789  => "1",
+	1234567890 => "1",
+];',
+			$result
+		);
+
+		$var = array(
+			"1"    => "1",
+			"12"   => "1",
+			"123"  => "1",
+			"1234" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(
+			'[
+	1	 => "1",
+	12	 => "1",
+	123	 => "1",
+	1234 => "1",
+];',
+			$result
+		);
+
+		$var = array(
+			"1"     => "1",
+			"12"    => "1",
+			"123"   => "1",
+			"1234"  => "1",
+			"12345" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(
+			'[
+	1	  => "1",
+	12	  => "1",
+	123	  => "1",
+	1234  => "1",
+	12345 => "1",
+];',
+			$result
+		);
+
+		$var = array(
+			"11"     => "1",
+			"112"    => "1",
+			"1123"   => "1",
+			"11234"  => "1",
+			"112345" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(
+			'[
+	11	   => "1",
+	112	   => "1",
+	1123   => "1",
+	11234  => "1",
+	112345 => "1",
+];',
+			$result
+		);
+
+		$var = array(
+			"111"     => "1",
+			"1112"    => "1",
+			"11123"   => "1",
+			"111234"  => "1",
+			"1112345" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(
+			'[
+	111		=> "1",
+	1112	=> "1",
+	11123	=> "1",
+	111234	=> "1",
+	1112345	=> "1",
+];',
+			$result
+		);
+
+		$var = array(
+			" 1"     => "1",
+			" 12"    => "1",
+			" 123"   => "1",
+			" 1234"  => "1",
+			" 12345" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame(
+			'[
+	" 1"	 => "1",
+	" 12"	 => "1",
+	" 123"	 => "1",
+	" 1234"	 => "1",
+	" 12345" => "1",
+];',
+			$result
+		);
+	}
+
+	/**
+	 * Tests code generation for Arrays with shortArraySyntax option disabled
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray_ShortSyntax()
+	{
+		$phpGen = $this->phpGen;
+		$phpGen->shortArraySyntax = false;
+
+		$var = array();
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame('array();', $result);
+
+		$var = array(0, 1, 2, 3);
+		$result = $phpGen->getCodeNoFormat($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame('array(0,1,2,3);', $result);
+
+		$var = array(0, 'a', false, true, null);
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	0,
+	"a",
+	false,
+	true,
+	null,
+);',
+			$result
+		);
+
+		$result = $phpGen->getCodeNoFormat($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame('array(0,"a",false,true,null);', $result);
+
+		$var = array('1' => 0, 1, 2, 3);
+		$result = $phpGen->getCodeNoFormat($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame('array(1=>0,2=>1,3=>2,4=>3);', $result);
+
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	1 => 0,
+	2 => 1,
+	3 => 2,
+	4 => 3,
+);',
+			$result
+		);
+
+		$result = $phpGen->getCodeNoTail($var, 3);
+		$this->assertSame($var, eval("return $result;"));
+		$this->assertSame(
+			'array(
+				1 => 0,
+				2 => 1,
+				3 => 2,
+				4 => 3,
+			)',
+			$result
+		);
+
+		$var = array('abc' => 0, 1, 2, 3);
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"abc" => 0,
+	0     => 1,
+	1     => 2,
+	2     => 3,
+);',
+			$result
+		);
+
+		$var = array('abc' => 0, 1, 2, 'abcdefg _-' => 3);
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"abc"        => 0,
+	0            => 1,
+	1            => 2,
+	"abcdefg _-" => 3,
+);',
+			$result
+		);
+
+		$var = array('abc' => 0, 1, array());
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"abc" => 0,
+	0     => 1,
+	1     => array(),
+);',
+			$result
+		);
+
+		$var = array(null => array(array(array())));
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"" => array(array(array())),
+);',
+			$result
+		);
+
+		$var = array('z' => array(1, array(array())));
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"z" => array(
+		1,
+		array(array()),
+	),
+);',
+			$result
+		);
+
+		$var = array(array());
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(array());',
+			$result
+		);
+
+		$var = array('sdfqergeger45hy4h5wg4w');
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array("sdfqergeger45hy4h5wg4w");',
+			$result
+		);
+
+		$var = array('sdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4w');
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"sdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4wsdfqergeger45hy4h5wg4w",
+);',
+			$result
+		);
+
+		$var = array("sdfqergeg\ner45hy4h5wg4w");
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"sdfqergeg
+er45hy4h5wg4w",
+);',
+			$result
+		);
+
+		$var = array(
+			"URL_ALL"       => "http://example.com/",
+			"DOMAIN_ALL"    => "example.com",
+			"DOMAIN_STATIC" => "assets.example.com",
+			"DIR_LOAD"      => "/apps/example/application/load/public/",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	"URL_ALL"       => "http://example.com/",
+	"DOMAIN_ALL"    => "example.com",
+	"DOMAIN_STATIC" => "assets.example.com",
+	"DIR_LOAD"      => "/apps/example/application/load/public/",
+);',
+			$result
+		);
+
+		$var = array(
+			""           => "1",
+			"1"          => "1",
+			"12"         => "1",
+			"123"        => "1",
+			"1234"       => "1",
+			"12345"      => "1",
+			"123456"     => "1",
+			"1234567"    => "1",
+			"12345678"   => "1",
+			"123456789"  => "1",
+			"1234567890" => "1",
+		);
+		$result = $phpGen->getCode($var);
+		$this->assertSame($var, eval("return $result"));
+		$this->assertSame(
+			'array(
+	""         => "1",
+	1          => "1",
+	12         => "1",
+	123        => "1",
+	1234       => "1",
+	12345      => "1",
+	123456     => "1",
+	1234567    => "1",
+	12345678   => "1",
+	123456789  => "1",
+	1234567890 => "1",
+);',
+			$result
+		);
+	}
+
+	/**
+	 * Tests code generation for Arrays with alignMultilineBreaks option disabled
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray_NotAlignMultilineBreaks()
+	{
+		$phpGen = $this->phpGen;
+		$phpGen->alignMultilineBreaks = false;
+
+		$canUseShortSyntax = self::$canUseShortSyntax;
+
+		$var = array(
+			"DOMAIN_ALL"     => "example.com",
+			"DOMAIN_STATIC_" => "assets.example.com",
+			"123"            => array(1, 2),
+			"URL_ALL"        => "http://example.com/",
+			"DIR_LOAD"       => "/apps/example/application/load/public/",
+			"456"            => array(1, 2),
+			1                => 1,
+			2                => 1,
+		);
+
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL"     => "example.com",
+	"DOMAIN_STATIC_" => "assets.example.com",
+	123              => [
+		1,
+		2,
+	],
+	"URL_ALL"        => "http://example.com/",
+	"DIR_LOAD"       => "/apps/example/application/load/public/",
+	456              => [
+		1,
+		2,
+	],
+	1                => 1,
+	2                => 1,
+];',
+			$result
+		);
+
+		$var1 = array(
+			"DOMAIN_ALL"     => "example.com",
+			"az"             => "example\nexample",
+			2                => 1,
+		);
+		$result = $phpGen->getCode($var1);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var1, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL" => "example.com",
+	"az"         => "example
+example",
+	2            => 1,
+];',
+			$result
+		);
+
+		$phpGen->spacesAfterKey = false;
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL"	 => "example.com",
+	"DOMAIN_STATIC_" => "assets.example.com",
+	123				 => [
+		1,
+		2,
+	],
+	"URL_ALL"		 => "http://example.com/",
+	"DIR_LOAD"		 => "/apps/example/application/load/public/",
+	456				 => [
+		1,
+		2,
+	],
+	1				 => 1,
+	2				 => 1,
+];',
+			$result
+		);
+
+		$phpGen->mixSpaces = false;
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL"		=> "example.com",
+	"DOMAIN_STATIC_"	=> "assets.example.com",
+	123					=> [
+		1,
+		2,
+	],
+	"URL_ALL"			=> "http://example.com/",
+	"DIR_LOAD"			=> "/apps/example/application/load/public/",
+	456					=> [
+		1,
+		2,
+	],
+	1					=> 1,
+	2					=> 1,
+];',
+			$result
+		);
+	}
+
+	/**
+	 * Some complex tests for code generation for Array type
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testArray_Complex()
+	{
+		$phpGen = $this->phpGen;
+
+		$canUseShortSyntax = self::$canUseShortSyntax;
+
+		$var = array(
+			"DOMAIN_ALL"    => "example.com",
+			"DOMAIN_STATIC" => "assets.example.com",
+			"DOMAIN_LOAD"   => array(),
+			"URL_ALL"       => "http://example.com/",
+			"URL_STATIC"    => "http://assets.example.com/",
+			"URL_LOAD"      => array(12),
+			"DIR_STATIC"    => "/apps/example/application/static/public/",
+			"DIR_LOAD"      => "/apps/example/application/load/public/",
+			12              => array("asdbel", 245),
+			"DIR_STATIC1"   => "/apps/example/application/static/public/",
+			"DIR_LOAD1"     => "/apps/example/application/load/public/",
+			array("asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiwe"),
+			"/apps/example/application/static/public/",
+			"/apps/example/application/load/public/",
+			array("asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiweuhfwo4hrsdfbw65hesrgbharsg34rgeWFDdfg5"),
+			"/apps/example/application/static/public/",
+			"/apps/example/application/load/public/",
+		);
+
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL"    => "example.com",
+	"DOMAIN_STATIC" => "assets.example.com",
+	"DOMAIN_LOAD"   => [],
+	"URL_ALL"       => "http://example.com/",
+	"URL_STATIC"    => "http://assets.example.com/",
+	"URL_LOAD"      => [12],
+	"DIR_STATIC"    => "/apps/example/application/static/public/",
+	"DIR_LOAD"      => "/apps/example/application/load/public/",
+	12              => [
+		"asdbel",
+		245,
+	],
+	"DIR_STATIC1" => "/apps/example/application/static/public/",
+	"DIR_LOAD1"   => "/apps/example/application/load/public/",
+	13            => ["asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiwe"],
+	14            => "/apps/example/application/static/public/",
+	15            => "/apps/example/application/load/public/",
+	16            => [
+		"asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiweuhfwo4hrsdfbw65hesrgbharsg34rgeWFDdfg5",
+	],
+	17 => "/apps/example/application/static/public/",
+	18 => "/apps/example/application/load/public/",
+];',
+			$result
+		);
+
+		$result = $phpGen->getCode($var, 3);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+				"DOMAIN_ALL"    => "example.com",
+				"DOMAIN_STATIC" => "assets.example.com",
+				"DOMAIN_LOAD"   => [],
+				"URL_ALL"       => "http://example.com/",
+				"URL_STATIC"    => "http://assets.example.com/",
+				"URL_LOAD"      => [12],
+				"DIR_STATIC"    => "/apps/example/application/static/public/",
+				"DIR_LOAD"      => "/apps/example/application/load/public/",
+				12              => [
+					"asdbel",
+					245,
+				],
+				"DIR_STATIC1" => "/apps/example/application/static/public/",
+				"DIR_LOAD1"   => "/apps/example/application/load/public/",
+				13            => [
+					"asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiwe",
+				],
+				14 => "/apps/example/application/static/public/",
+				15 => "/apps/example/application/load/public/",
+				16 => [
+					"asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiweuhfwo4hrsdfbw65hesrgbharsg34rgeWFDdfg5",
+				],
+				17 => "/apps/example/application/static/public/",
+				18 => "/apps/example/application/load/public/",
+			];',
+			$result
+		);
+
+		$var["DOMAIN_STATIC__"] = array(array(array()));
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_ALL"    => "example.com",
+	"DOMAIN_STATIC" => "assets.example.com",
+	"DOMAIN_LOAD"   => [],
+	"URL_ALL"       => "http://example.com/",
+	"URL_STATIC"    => "http://assets.example.com/",
+	"URL_LOAD"      => [12],
+	"DIR_STATIC"    => "/apps/example/application/static/public/",
+	"DIR_LOAD"      => "/apps/example/application/load/public/",
+	12              => [
+		"asdbel",
+		245,
+	],
+	"DIR_STATIC1" => "/apps/example/application/static/public/",
+	"DIR_LOAD1"   => "/apps/example/application/load/public/",
+	13            => ["asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiwe"],
+	14            => "/apps/example/application/static/public/",
+	15            => "/apps/example/application/load/public/",
+	16            => [
+		"asdfkjeeiufghq34t9heifhewijhqioufhewoiuhgqoiweuhfwo4hrsdfbw65hesrgbharsg34rgeWFDdfg5",
+	],
+	17                => "/apps/example/application/static/public/",
+	18                => "/apps/example/application/load/public/",
+	"DOMAIN_STATIC__" => [[[]]],
+];',
 			$result
 		);
 	}

@@ -16,6 +16,10 @@
 	"require": {
 		"php": ">=5.3.3"
 	},
+	"suggest": {
+		"ext-reflection": "Used for closure support",
+		"ext-spl":        "Used for closure support"
+	},
 	"autoload": {
 		"psr-0": {
 			"Aza\\Components\\PhpGen": ""
