@@ -4,10 +4,10 @@
 	"keywords": [
 		"php", "code", "dump", "generation", "serialization"
 	],
-	"homepage": "https://github.com/Anizoptera/PhpGen",
+	"homepage": "https://github.com/Anizoptera/AzaPhpGen",
 	"license": "MIT",
 	"support": {
-		"issues": "https://github.com/Anizoptera/PhpGen/issues"
+		"issues": "https://github.com/Anizoptera/AzaPhpGen/issues"
 	},
 	"authors": [
 		{"name": "Amal Samally", "email": "amal.samally@gmail.com", "homepage": "https://github.com/amal"},
