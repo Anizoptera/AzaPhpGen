@@ -13,6 +13,8 @@ use Traversable;
  *
  * @project Anizoptera CMF
  * @package system.phpgen
+ * @author  Amal Samally <amal.samally at gmail.com>
+ * @license MIT
  */
 class PhpGen
 {

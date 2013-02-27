@@ -12,6 +12,8 @@ use SplFixedArray;
  *
  * @project Anizoptera CMF
  * @package system.phpgen
+ * @author  Amal Samally <amal.samally at gmail.com>
+ * @license MIT
  *
  * @covers Aza\Components\PhpGen\PhpGen
  * @covers Aza\Components\PhpGen\IPhpGenerable

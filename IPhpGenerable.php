@@ -8,6 +8,8 @@ namespace Aza\Components\PhpGen;
  *
  * @project Anizoptera CMF
  * @package system.phpgen
+ * @author  Amal Samally <amal.samally at gmail.com>
+ * @license MIT
  */
 interface IPhpGenerable
 {
