@@ -996,6 +996,33 @@ er45hy4h5wg4w",
 		);
 
 		$var = array(
+			"DOMAIN_STATIC_" => array(1, 2),
+			"DOMAIN"         => array(1, 2),
+			1                => array(1, 2),
+		);
+		$result = $phpGen->getCode($var);
+		if ($canUseShortSyntax) {
+			$this->assertSame($var, eval("return $result"));
+		}
+		$this->assertSame(
+			'[
+	"DOMAIN_STATIC_" => [
+		1,
+		2,
+	],
+	"DOMAIN" => [
+		1,
+		2,
+	],
+	1 => [
+		1,
+		2,
+	],
+];',
+			$result
+		);
+
+		$var = array(
 			"DOMAIN_ALL"     => "example.com",
 			2                => 1,
 		);
