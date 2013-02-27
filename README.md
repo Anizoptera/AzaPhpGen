@@ -24,7 +24,7 @@ Features:
 * Very flexible configuration (9 code building options, see in [PhpGen class code](PhpGen.php#L19));
 * Convenient, fully documented and test covered API;
 
-AzaPhpGen is a part of Anizoptera CMF, written by [Amal Samally](http://azagroup.ru/#amal) (amal.samally at gmail.com).
+AzaPhpGen is a part of [Anizoptera CMF](https://github.com/Anizoptera), written by [Amal Samally](http://azagroup.ru/#amal) (amal.samally at gmail.com) and [AzaGroup](http://azagroup.ru/) team.
 
 Licensed under the MIT License.
 
