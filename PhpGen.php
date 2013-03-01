@@ -48,6 +48,11 @@ class PhpGen
 	public $oneLineStrings = false;
 
 	/**
+	 * Escape all characters in strings.
+	 */
+	public $binaryStrings = false;
+
+	/**
 	 * Output array keys for serial arrays.
 	 */
 	public $outputSerialKeys = false;
@@ -190,11 +195,16 @@ class PhpGen
 		}
 		// String
 		// http://php.net/language.types.string#language.types.string.syntax.double
-		$regexp = $this->oneLineStrings
-				? '\x00-\x1F'
-				: '\x00-\x08\x0B-\x1F';
+		if ($this->binaryStrings) {
+			$regexp = '~.~s';
+		} else {
+			$regexp = $this->oneLineStrings
+					? '\x00-\x1F'
+					: '\x00-\x08\x0B-\x1F';
+			$regexp = '~['.$regexp.'\x22\x24\x5C\x7F]~SX';
+		}
 		$data = preg_replace_callback(
-			'~['.$regexp.'\x22\x24\x5C\x7F]~SX',
+			$regexp,
 			function($char) {
 				// linefeed (LF or 0x0A (10) in ASCII)
 				if ("\n" === ($char = $char[0])) {
