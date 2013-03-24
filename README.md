@@ -21,10 +21,23 @@ Features:
 - Closures support (closures with "use" and few closures in one line are not supported!) (see usage in [Example #4](#example-4---closure-example));
 - Custom object dumping with [IPhpGenerable interface](IPhpGenerable.php) (see usage in [Example #5](#example-5---custom-object-dumping-with-iphpgenerable-interface));
 - Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-simple-customcode-class-usage));
-- Custom object dumping with defined handlers (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
+- Custom object dumping with defined handlers/hooks (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
 - Very flexible configuration (9 code building options, see in [PhpGen class code](PhpGen.php#L19));
 - Automatic recognition of binary strings;
 - Convenient, fully documented and test covered API;
+
+
+Benefits over `var_export()`:
+
+- `var_export` does not support Closures dumping;
+- `var_export` supports only objects with `__set_state` function. AzaPhpGen supports all serializable objects;
+- AzaPhpGen dumps Traversable objects as arrays (via `iterator_to_array`);
+- For binary strings `var_export` generates very ugly code that is awkward to use and can be easily corrupted;
+- For objects `var_export` generates code that can not be evaluated in namespace;
+- AzaPhpGen give you full control over objects dumping with custom handlers and `IPhpGenerable` interface;
+- With AzaPhpGen you can flexibly customize formatting of your code (useful for arrays);
+- AzaPhpGen can generate code with or without trailing semicolon. `var_export` never outputs it :)
+- Some detailed comparisons you can see in [Tests/PhpGenBenchmarkTest.php](Tests/PhpGenBenchmarkTest.php#L647);
 
 
 AzaPhpGen is a part of [Anizoptera CMF][], written by [Amal Samally][] (amal.samally at gmail.com) and [AzaGroup][] team.

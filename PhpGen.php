@@ -334,6 +334,7 @@ class PhpGen
 				}
 			}
 		}
+		// TODO: Add __set_state function support?
 		// Default - serialization
 		return "unserialize({$this->getCodeNoTail(serialize($object))})";
 	}
