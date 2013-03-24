@@ -5,7 +5,7 @@ Anizoptera CMF PHP code generation (dump, serialization) component.
 
 https://github.com/Anizoptera/AzaPhpGen
 
-[![Build Status](https://secure.travis-ci.org/Anizoptera/AzaPhpGen.png?branch=master)](http://travis-ci.org/Anizoptera/AzaPhpGen)
+[![Build Status][TravisImage]][Travis]
 
 Allows to dump complex arrays, objects, closures and basic data types as php code.
 In part, this can be called a some sort of serialization.
@@ -13,18 +13,34 @@ And you can customize your dumped php code as you wish.
 
 It is very usefull for code compilation (usually for caching purposes).
 
+
 Features:
 
-* Supports all scalar values (bool, int, float, string), nulls, arrays, serializable objects;
-* [Traversable](http://php.net/traversable) support (dumped as array, see usage in [Example #3](#example-3---traversable-dump));
-* Closures support (closures with "use" and few closures in one line are not supported!) (see usage in [Example #4](#example-4---closure-example));
-* Custom object dumping with [IPhpGenerable interface](IPhpGenerable.php) (see usage in [Example #5](#example-5---custom-object-dumping-with-iphpgenerable-interface));
-* Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-simple-customcode-class-usage));
-* Custom object dumping with defined handlers (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
-* Very flexible configuration (9 code building options, see in [PhpGen class code](PhpGen.php#L19));
-* Convenient, fully documented and test covered API;
+- Supports all scalar values (bool, int, float, string), nulls, arrays, serializable objects;
+- [Traversable](http://php.net/traversable) support (dumped as array, see usage in [Example #3](#example-3---traversable-dump));
+- Closures support (closures with "use" and few closures in one line are not supported!) (see usage in [Example #4](#example-4---closure-example));
+- Custom object dumping with [IPhpGenerable interface](IPhpGenerable.php) (see usage in [Example #5](#example-5---custom-object-dumping-with-iphpgenerable-interface));
+- Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-simple-customcode-class-usage));
+- Custom object dumping with defined handlers/hooks (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
+- Very flexible configuration (9 code building options, see in [PhpGen class code](PhpGen.php#L19));
+- Automatic recognition of binary strings;
+- Convenient, fully documented and test covered API;
 
-AzaPhpGen is a part of Anizoptera CMF, written by [Amal Samally](http://azagroup.ru/#amal) (amal.samally at gmail.com).
+
+Benefits over `var_export()`:
+
+- `var_export` does not support Closures dumping;
+- `var_export` supports only objects with `__set_state` function. AzaPhpGen supports all serializable objects;
+- AzaPhpGen dumps Traversable objects as arrays (via `iterator_to_array`);
+- For binary strings `var_export` generates very ugly code that is awkward to use and can be easily corrupted;
+- For objects `var_export` generates code that can not be evaluated in namespace;
+- AzaPhpGen give you full control over objects dumping with custom handlers and `IPhpGenerable` interface;
+- With AzaPhpGen you can flexibly customize formatting of your code (useful for arrays);
+- AzaPhpGen can generate code with or without trailing semicolon. `var_export` never outputs it :)
+- Some detailed comparisons you can see in [Tests/PhpGenBenchmarkTest.php](Tests/PhpGenBenchmarkTest.php#L647);
+
+
+AzaPhpGen is a part of [Anizoptera CMF][], written by [Amal Samally][] (amal.samally at gmail.com) and [AzaGroup][] team.
 
 Licensed under the MIT License.
 
@@ -40,7 +56,7 @@ Installation
 ------------
 
 The recommended way to install AzaPhpGen is [through composer](http://getcomposer.org).
-You can see [package information on Packagist.](https://packagist.org/packages/aza/phpgen)
+You can see [package information on Packagist.][ComposerPacket]
 
 ```JSON
 {
@@ -244,4 +260,13 @@ Or with coverage report:
 License
 -------
 
-MIT, see [LICENSE.md](LICENSE.md)
+[MIT](http://www.opensource.org/licenses/mit-license.html), see [LICENSE.md](LICENSE.md)
+
+
+
+[Anizoptera CMF]: https://github.com/Anizoptera
+[Amal Samally]:   http://azagroup.ru/about/
+[AzaGroup]:       http://azagroup.ru/
+[ComposerPacket]: https://packagist.org/packages/aza/phpgen
+[TravisImage]:    https://secure.travis-ci.org/Anizoptera/AzaPhpGen.png?branch=master
+[Travis]:         http://travis-ci.org/Anizoptera/AzaPhpGen
