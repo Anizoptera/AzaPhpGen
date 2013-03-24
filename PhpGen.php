@@ -199,7 +199,7 @@ class PhpGen
 			return $this->getObject($data, $indent, $noFormat) . $tail;
 		}
 		// String
-		return $this->getString($data) . $tail;
+		return $this->getString((string)$data) . $tail;
 	}
 
 

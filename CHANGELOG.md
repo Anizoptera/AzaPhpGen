@@ -1,6 +1,7 @@
 development
 -----------
 25.03.2013
+- Test for resource type
 - Automatic recognition of binary strings
 - Binary strings output improvement (encode '"', '\\', '$')
 - More tests for resulting code (NAN, INF)

@@ -763,6 +763,24 @@ You can see [package information on Packagist.](https://packagist.org/packages/a
 
 
 	/**
+	 * Tests code generation for Resource type
+	 *
+	 * @author amal
+	 * @group unit
+	 */
+	public function testResource()
+	{
+		$phpGen = $this->phpGen;
+
+		$var = fopen('php://stderr', 'w');
+		$this->assertTrue(is_resource($var));
+
+		$result = $phpGen->getCode($var);
+		$this->assertContains('Resource id #', $result);
+	}
+
+
+	/**
 	 * Tests code generation for String type
 	 *
 	 * @author amal
