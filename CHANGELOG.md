@@ -1,11 +1,15 @@
-development
------------
-25.03.2013
-- Test for resource type
-- Automatic recognition of binary strings
-- Binary strings output improvement (encode '"', '\\', '$')
-- More tests for resulting code (NAN, INF)
+CHANGELOG
+=========
 
-AzaPhpGen-1.0
--------------
-25.02.2013
+
+## development
+
+##### 25.03.2013
+- **MINOR:** Test for resource type
+- **NEW FEATURE:** Automatic recognition of binary strings
+- **IMPROVED:** Binary strings output improvement (encode '"', '\\', '$')
+- **MINOR:** More tests for resulting code (NAN, INF)
+
+
+## 1.0 (25.02.2013)
+- First public release
