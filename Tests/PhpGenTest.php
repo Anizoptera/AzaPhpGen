@@ -420,6 +420,31 @@ class PhpGenTest extends TestCase
 		$var = 99999.99999;
 		$result = $phpGen->getCode($var);
 		$this->assertSame('99999.99999;', $result);
+
+		// ----
+		$var = NAN;
+		$result = $phpGen->getCode($var);
+		$this->assertSame('NAN;', $result);
+
+		// ----
+		$var = acos(8);
+		$result = $phpGen->getCode($var);
+		$this->assertSame('NAN;', $result);
+
+		// ----
+		$var = INF;
+		$result = $phpGen->getCode($var);
+		$this->assertSame('INF;', $result);
+
+		// ----
+		$var = -INF;
+		$result = $phpGen->getCode($var);
+		$this->assertSame('-INF;', $result);
+
+		// ----
+		$var = log(0);
+		$result = $phpGen->getCode($var);
+		$this->assertSame('-INF;', $result);
 	}
 
 	/**
