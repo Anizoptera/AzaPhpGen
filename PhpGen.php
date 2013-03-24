@@ -53,6 +53,11 @@ class PhpGen
 	public $binaryStrings = false;
 
 	/**
+	 * Automatic recognition of binary strings
+	 */
+	public $binaryAutoCheck = true;
+
+	/**
 	 * Output array keys for serial arrays.
 	 */
 	public $outputSerialKeys = false;
@@ -194,18 +199,51 @@ class PhpGen
 			return $this->getObject($data, $indent, $noFormat) . $tail;
 		}
 		// String
-		// http://php.net/language.types.string#language.types.string.syntax.double
-		if ($this->binaryStrings) {
-			$regexp = '~.~s';
+		return $this->getString($data) . $tail;
+	}
+
+
+	/**
+	 * Returns php code for string
+	 *
+	 * @link http://php.net/language.types.string#language.types.string.syntax.double
+	 *
+	 * @param string $string <p>
+	 * String data
+	 * </p>
+	 *
+	 * @return string
+	 */
+	protected function getString($string)
+	{
+		// Binary strings are completely encoded in contrast to ordinary
+		// So we try to distinguish between a binary string and a usual
+		if (!($binary = $this->binaryStrings) && $this->binaryAutoCheck) {
+			// Simple check based on PCRE error for malformed UTF-8 data (not work for valid ASCII)
+			$binary = false === preg_match('~~u', $string)
+			       // Match for most non printable chars somewhat taking multibyte chars into account
+			       // Variant from sebastianbergmann/exporter by Sebastian Bergmann <sebastian@phpunit.de>
+			       // Works good for binary strings that consist of valid ASCII chars
+			       || preg_match('~[^\x09-\x0d\x20-\xff]~S', $string);
+		}
+
+		// Build regexp
+		if ($binary) {
+			$regexp = '~.~Ss';
 		} else {
 			$regexp = $this->oneLineStrings
-					? '\x00-\x1F'
-					: '\x00-\x08\x0B-\x1F';
-			$regexp = '~['.$regexp.'\x22\x24\x5C\x7F]~SX';
+				// All control chars
+					? '\x00-\x1F\x7F'
+				// Ctrl chars without \n & \t
+					: '\x00-\x08\x0B-\x1F\x7F';
+			// Additional chars: \x22 ("), \x24 ($), \x5C (\\)
+			$regexp = '~['.$regexp.'\x22\x24\x5C]~S';
 		}
-		$data = preg_replace_callback(
+
+		// Format string
+		$string = preg_replace_callback(
 			$regexp,
-			function($char) {
+			function($char) use ($binary) {
 				// linefeed (LF or 0x0A (10) in ASCII)
 				if ("\n" === ($char = $char[0])) {
 					return '\n';
@@ -223,25 +261,26 @@ class PhpGen
 					return '\v';
 				}
 				// escape (ESC or 0x1B (27) in ASCII) (since PHP 5.4.0)
-//					else if ("\e" === $char) {
-//						return '\e';
-//					}
+				// works only for PHP 5.4.0 or above, so disable
+//				else if ("\e" === $char) {
+//					return '\e';
+//				}
 				// form feed (FF or 0x0C (12) in ASCII) (since PHP 5.2.5)
 				else if ("\f" === $char) {
 					return '\f';
 				}
 				// chars that must be escaped in a double-quoted string
-				else if ('\\' === $char || '$' === $char || '"' === $char) {
+				else if (!$binary && ('\\' === $char || '$' === $char || '"' === $char)) {
 					return "\\$char";
 				}
 				// all other chars
 				return sprintf('\x%02X', ord($char));
 			},
-			(string)$data
+			(string)$string
 		);
-		return '"' . $data . '"' . $tail;
-	}
 
+		return '"' . $string . '"';
+	}
 
 	/**
 	 * Returns php code for object

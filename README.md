@@ -22,6 +22,7 @@ Features:
 * Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-simple-customcode-class-usage));
 * Custom object dumping with defined handlers (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
 * Very flexible configuration (9 code building options, see in [PhpGen class code](PhpGen.php#L19));
+* Automatic recognition of binary strings;
 * Convenient, fully documented and test covered API;
 
 AzaPhpGen is a part of [Anizoptera CMF](https://github.com/Anizoptera), written by [Amal Samally](http://azagroup.ru/#amal) (amal.samally at gmail.com) and [AzaGroup](http://azagroup.ru/) team.
