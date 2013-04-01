@@ -18,7 +18,7 @@ Features:
 
 - Supports all scalar values (bool, int, float, string), nulls, arrays, serializable objects;
 - [Traversable](http://php.net/traversable) support (dumped as array, see usage in [Example #3](#example-3---traversable-dump));
-- Closures support (closures with "use" and few closures in one line are not supported!) (see usage in [Example #4](#example-4---closure-example));
+- Closures support (closures with "use", several closures in one line are not supported!) (see usage and more info in [Example #4](#example-4---closure-example));
 - Custom object dumping with [IPhpGenerable interface](IPhpGenerable.php) (see usage in [Example #5](#example-5---custom-object-dumping-with-iphpgenerable-interface));
 - Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-simple-customcode-class-usage));
 - Custom object dumping with defined handlers/hooks (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
@@ -157,7 +157,13 @@ $var[1] = 'b';
 echo $phpGen->getCodeNoFormat($var) . PHP_EOL; // ["a","b",null];
 ```
 
-#### Example #4 - Closure example
+#### Example #4 - Closure (anonymous function) example
+
+**WARNING:** Closures are dumped as is. So complex closures are not supported:
+* Closures with "use" statement (closures that inherit variables from the parent scope);
+* Several closures in one line are;
+* Usage of non-qualified class name (with importing) in closure;
+* Closures with `$this` variable usage;
 
 ```php
 $closure = function($a, $b) {
