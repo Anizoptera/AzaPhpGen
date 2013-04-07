@@ -7,6 +7,31 @@ https://github.com/Anizoptera/AzaPhpGen
 
 [![Build Status][TravisImage]][Travis]
 
+
+Table of Contents
+-----------------
+
+1. [Introduction](#introduction)
+2. [Requirements](#requirements)
+3. [Installation](#installation)
+4. [Examples](#examples)
+   * [Simple dump](#example-1---simple-dump)
+   * [Array dump](#example-2---array-dump)
+   * [Traversable dump](#example-3---traversable-dump)
+   * [Closure (anonymous function) example](#example-4---closure-anonymous-function-example)
+   * [Custom object dumping with IPhpGenerable interface](#example-5---custom-object-dumping-with-iphpgenerable-interface)
+   * [Bundled CustomCode class usage](#example-6---bundled-customcode-class-usage)
+   * [Custom object dumping with defined handlers](#example-7---custom-object-dumping-with-defined-handlers)
+   * [AzaPhpGen customization](#example-8---azaphpgen-customization)
+5. [Tests](#tests)
+6. [Credits](#credits)
+7. [License](#license)
+8. [Links](#links)
+
+
+Introduction
+------------
+
 Allows to dump complex arrays, objects, closures and basic data types as php code.
 In part, this can be called a some sort of serialization.
 And you can customize your dumped php code as you wish.
@@ -14,20 +39,20 @@ And you can customize your dumped php code as you wish.
 It is very usefull for code compilation (usually for caching purposes).
 
 
-Features:
+**Features:**
 
 - Supports all scalar values (bool, int, float, string), nulls, arrays, serializable objects;
 - [Traversable](http://php.net/traversable) support (dumped as array, see usage in [Example #3](#example-3---traversable-dump));
-- Closures support (closures with "use", several closures in one line are not supported!) (see usage and more info in [Example #4](#example-4---closure-example));
+- Closures support (closures with "use", several closures on the same line are not supported!) (see usage and more info in [Example #4](#example-4---closure-anonymous-function-example));
 - Custom object dumping with [IPhpGenerable interface](IPhpGenerable.php) (see usage in [Example #5](#example-5---custom-object-dumping-with-iphpgenerable-interface));
-- Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-simple-customcode-class-usage));
+- Bundled simple [CustomCode class](CustomCode.php) (see usage in [Example #6](#example-6---bundled-customcode-class-usage));
 - Custom object dumping with defined handlers/hooks (see usage in [Example #7](#example-7---custom-object-dumping-with-defined-handlers));
 - Very flexible configuration (9 code building options, see in [PhpGen class code](PhpGen.php#L19));
 - Automatic recognition of binary strings;
 - Convenient, fully documented and test covered API;
 
 
-Benefits over `var_export()`:
+**Benefits over `var_export()`:**
 
 - `var_export` does not support Closures dumping;
 - `var_export` supports only objects with `__set_state` function. AzaPhpGen supports all serializable objects;
@@ -38,11 +63,6 @@ Benefits over `var_export()`:
 - With AzaPhpGen you can flexibly customize formatting of your code (useful for arrays);
 - AzaPhpGen can generate code with or without trailing semicolon. `var_export` never outputs it :)
 - Some detailed comparisons you can see in [Tests/PhpGenBenchmarkTest.php](Tests/PhpGenBenchmarkTest.php#L647);
-
-
-AzaPhpGen is a part of [Anizoptera CMF][], written by [Amal Samally][] (amal.samally at gmail.com) and [AzaGroup][] team.
-
-Licensed under the MIT License.
 
 
 Requirements
@@ -56,7 +76,7 @@ Installation
 ------------
 
 The recommended way to install AzaPhpGen is [through composer](http://getcomposer.org).
-You can see [package information on Packagist.][ComposerPacket]
+You can see [package information on Packagist][ComposerPackage].
 
 ```JSON
 {
@@ -75,7 +95,7 @@ You can use [examples/example.php](examples/example.php) to run all examples.
 #### Example #1 - Simple dump
 
 ```php
-// Get singleton instance of PhpGen
+// Get singleton instance of PhpGen (fast and simple variant)
 $phpGen = PhpGen::instance();
 // Integer
 echo $phpGen->getCode(123456789) . PHP_EOL; // 123456789;
@@ -150,6 +170,8 @@ echo $phpGen->getCodeNoFormat($array) . PHP_EOL;
 
 #### Example #3 - Traversable dump
 
+AzaPhpGen treat all Traversable objects as arrays (with [iterator_to_array](http://php.net/iterator-to-array)).
+
 ```php
 $var = new SplFixedArray(3);
 $var[0] = 'a';
@@ -161,7 +183,7 @@ echo $phpGen->getCodeNoFormat($var) . PHP_EOL; // ["a","b",null];
 
 **WARNING:** Closures are dumped as is. So complex closures are not supported:
 * Closures with "use" statement (closures that inherit variables from the parent scope);
-* Several closures in one line are;
+* Several closures on the same line;
 * Usage of non-qualified class name (with importing) in closure;
 * Closures with `$this` variable usage;
 
@@ -187,6 +209,8 @@ echo $phpGen->getCode(array('key' => $closure)) . PHP_EOL;
 
 #### Example #5 - Custom object dumping with IPhpGenerable interface
 
+You can customize dumping of your classes by implementing the `IPhpGenerable` interface.
+
 ```php
 class ExampleCustomCode implements IPhpGenerable
 {
@@ -203,7 +227,10 @@ echo $phpGen->getCode($var) . PHP_EOL; // 32434 + 5678;
 echo $phpGen->getCode(array($var)) . PHP_EOL; // [32434 + 5678];
 ```
 
-#### Example #6 - Bundled simple CustomCode class usage
+#### Example #6 - Bundled CustomCode class usage
+
+For the simpliest varint of `IPhpGenerable` interface usages you can use bundled class - `CustomCode`.
+It just takes the required code as a constructor argument.
 
 ```php
 $var = new CustomCode('"some code" . PHP_EOL');
@@ -214,6 +241,9 @@ echo $phpGen->getCode(array($var)) . PHP_EOL; // ["some code" . PHP_EOL];
 ```
 
 #### Example #7 - Custom object dumping with defined handlers
+
+Second varint of resulting code customization - usage of defined handlers (hooks) for the classes.
+This way you can customize dump of any possible class!
 
 ```php
 // Set custom handler for DateTime type
@@ -229,6 +259,10 @@ echo $phpGen->getCode($var) . PHP_EOL; // "2013-02-23+0000";
 ```
 
 #### Example #8 - AzaPhpGen customization
+
+AzaPhpGen has many options. So it's very simple to configure your resulting code
+for your special needs (code style for example).
+You can see all available options in the [PhpGen class code](PhpGen.php#L19).
 
 ```php
 // Disable short array syntax and use 6 spaces for indentation
@@ -263,16 +297,32 @@ Or with coverage report:
     $ phpunit --configuration phpunit.xml.dist --coverage-html code_coverage/
 
 
+Credits
+-------
+
+AzaPhpGen is a part of [Anizoptera CMF][], written by [Amal Samally][] (amal.samally at gmail.com) and [AzaGroup][] team.
+
+
 License
 -------
 
-[MIT](http://www.opensource.org/licenses/mit-license.html), see [LICENSE.md](LICENSE.md)
+Released under the [MIT](LICENSE.md) license.
+
+
+Links
+-----
+
+* [Composer package][ComposerPackage]
+* [Last build on the Travis CI][Travis]
+* [Project profile on the Ohloh](https://www.ohloh.net/p/AzaPhpGen)
+* Other Anizoptera CMF components on the [GitHub][Anizoptera CMF] / [Packagist](https://packagist.org/packages/aza)
+* (RU) [AzaGroup team blog][AzaGroup]
 
 
 
-[Anizoptera CMF]: https://github.com/Anizoptera
-[Amal Samally]:   http://azagroup.ru/about/
-[AzaGroup]:       http://azagroup.ru/
-[ComposerPacket]: https://packagist.org/packages/aza/phpgen
-[TravisImage]:    https://secure.travis-ci.org/Anizoptera/AzaPhpGen.png?branch=master
-[Travis]:         http://travis-ci.org/Anizoptera/AzaPhpGen
+[Anizoptera CMF]:  https://github.com/Anizoptera
+[Amal Samally]:    http://azagroup.ru/about/#amal
+[AzaGroup]:        http://azagroup.ru/
+[ComposerPackage]: https://packagist.org/packages/aza/phpgen
+[TravisImage]:     https://secure.travis-ci.org/Anizoptera/AzaPhpGen.png?branch=master
+[Travis]:          http://travis-ci.org/Anizoptera/AzaPhpGen
