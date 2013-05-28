@@ -4,7 +4,8 @@ CHANGELOG
 ## Version 1.2 (work in progress)
 
 
-## Version 1.1.1 (07.04.2013)
+## Version 1.1.1 (28.05.2013)
+07.04.2013
 - **MINOR:** Massive README and CHANGELOG improvements (amal)
 
 
